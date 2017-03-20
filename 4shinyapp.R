@@ -1,0 +1,5 @@
+library(shiny)
+#library(rsconnect)
+#setwd('~/desktop/探索性数据分析_刘老师')
+runApp('./shinyapp/')
+#deployApp('./shinyapp/')

@@ -1,0 +1,94 @@
+library(ggplot2)
+library(showtext)
+library(grid)
+library(grDevices)
+showtext.auto(enable=T)
+
+setwd('~/Desktop/探索性数据分析_刘老师/')
+squre=read.csv('./data/squre.csv',header=T,sep=',')
+amount=read.csv('./data/amount.csv',header=T,sep=',')
+x1=as.matrix(squre[,c(5:26)])*10000
+x2=as.matrix(amount[,c(5:26)])*100000000
+price=data.frame(name=squre$地区,x2/x1)
+income=read.csv('./data/income.csv',header=T,sep=',')
+income=data.frame(name=income$地区,income[5:12])
+
+pfun=function(time){
+  options(warn=-1)
+  name=price['name']$name[-1]
+  y=as.matrix(price[paste('X',time,sep='')])[-1]
+  x=as.matrix(income[paste('X',time,sep='')])[-1]
+  n=dim(x)[1]
+  p=dim(x)[2]
+  x=cbind(1,x)
+  beta_hat=solve(t(x)%*%x)%*%t(x)%*%y
+  y_bar=mean(y)
+  y_hat=x%*%beta_hat
+  #error_hat=y-y_hat
+  #s_2=t(error_hat)%*%error_hat/(n-p)
+  R_2=sum((y_hat-y_bar)^2)/sum((y-y_bar)^2)
+  text='y = beta_0 + beta_1 x'
+  text=sub('beta_0',round(beta_hat[1],1),text)
+  text=sub('beta_1',round(beta_hat[2],3),text)
+  pd=data.frame(name=name,x=x[,2],y=y,y_hat=y_hat)
+  pd$fill=ifelse(pd$y>pd$y_hat,'1','0')
+  h_x=max(pd$x)
+  l_x=min(pd$x)
+  c_x=h_x-l_x
+  h_y=max(pd$y)
+  l_y=min(pd$y)
+  c_y=h_y-l_y
+  ph1=ggplot(pd)+
+    geom_point(aes(x=x,y=y,color=fill),
+               shape=2,size=2)+
+    geom_line(aes(x=x,y=y_hat),linetype=2,size=0.8)+
+    geom_text(data=pd[c(order(pd$y,decreasing=T)[1:8],order(pd$x,decreasing=T)[1:8]),],
+              aes(x=x,y=y,label=name,color=fill),
+              size=3,vjust=-1)+
+    labs(x='城镇居民家庭人均可支配收入',y='商品房销售平均价格',title='回归分析')+
+    annotate('text',x=l_x+c_x/5,y=h_y-c_y/9,
+             label=text,size=4)+
+    annotate('text',x=l_x+c_x/5,y=h_y-c_y/6,
+             label=paste('R_squre =',round(R_2,2)),size=4)+
+    annotate('text',x=h_x-c_x/5,y=l_y+c_y/9,
+             label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                         time,sep=''),size=4)+
+    scale_color_manual(values=c('darkblue','darkred'))+
+    theme_bw()+
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=18),
+          legend.position="None",
+          plot.title=element_text(size=18,hjust=0.5))
+  pd$y2=pd$y
+  pd$y2[pd$fill==0]=-pd$y2[pd$fill==0]
+  pd$name=factor(pd$name,levels=pd$name[order(pd$y)])
+  ph2=ggplot()+
+    geom_bar(data=pd,
+             aes(x=name,y=y2,fill=fill),stat='identity')+
+    #scale_y_continuous(labels=c(20000,10000,0,10000,20000))+
+    scale_fill_manual(values=c('darkblue','darkred'))+
+    annotate('text',x=4,y=h_y-c_y/3,
+             label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                         time,sep=''),size=4)+
+    labs(x='',y='商品房销售平均价格',
+         title='房价较低 VS 房价较高')+
+    theme_bw()+
+    theme(axis.text=element_text(size=10),
+          axis.title=element_text(size=15),
+          legend.position="None",
+          plot.title=element_text(size=18,hjust=0.5))+
+    coord_flip()
+  grid.newpage()
+  pushViewport(viewport(layout=grid.layout(1,2)))
+  vplayout=function(x,y){
+    viewport(layout.pos.row=x,layout.pos.col=y)
+  }
+  print(ph1,vp=vplayout(1,1))
+  print(ph2,vp=vplayout(1,2))
+}
+
+for(time in c('2015.03','2015.06','2015.09','2015.12','2016.03','2016.06','2016.09','2016.12')){
+  pdf(paste('回归模型',time,'.pdf',sep=''),height=5,width=9)
+  pfun(time)
+  dev.off()
+}

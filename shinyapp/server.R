@@ -1,0 +1,137 @@
+library(shiny)
+library(ggplot2)
+library(plyr)
+
+load('price.rda')
+load('state.rda')
+load('income.rda')
+load('map.rda')
+
+income_plot=function(time,type='map'){
+  options(warn=-1)
+  dat1=data.frame(income['name'],income[paste('X',time,sep='')])
+  names(dat1)=c('name','y')
+  if(type=='map'){
+    income_map=join(map,dat1,by='name')
+    ph=ggplot()+
+      geom_polygon(data=income_map,
+                   aes(x=long,y=lat,group=group,fill=y),
+                   color="white",size=0.2)+
+      scale_fill_gradient(low='gray',high='darkred')+
+      geom_text(data=state,aes(x=long,y=lat,label=name),size=3.5)+
+      annotate('text',x=85,y=10,
+               label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                           time,sep=''),size=5)+
+      labs(x='',y='',fill='')+
+      coord_map()+
+      theme_bw()+
+      theme(panel.border=element_blank())
+  }else{
+    state_map=join(state,dat1,by='name')
+    ph=ggplot()+
+      geom_polygon(data=map,aes(x=long,y=lat,group=group),
+                   color="black",fill='white',size=0.2)+
+      geom_point(data=state_map,aes(x=long,y=lat,size=y),
+                 color='darkred',alpha=0.7)+
+      geom_text(data=state_map,
+                aes(x=long,y=lat,label=name),size=3.5)+
+      scale_size_continuous(range=c(1,10))+
+      annotate('text',x=85,y=10,
+               label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                           time,sep=''),size=5)+
+      labs(x='',y='',size='')+
+      coord_map()+
+      theme_bw()+
+      theme(panel.border=element_blank())
+  }
+  return(ph)
+}
+
+price_plot=function(time,type='map'){
+  options(warn=-1)
+  dat1=data.frame(price['name'],price[paste('X',time,sep='')])
+  names(dat1)=c('name','y')
+  if(type=='map'){
+    price_map=join(map,dat1,by='name')
+    ph=ggplot()+
+      geom_polygon(data=price_map,
+                   aes(x=long,y=lat,group=group,fill=y),
+                   color="white",size=0.2)+
+      scale_fill_gradient(low='gray',high='darkblue')+
+      geom_text(data=state,aes(x=long,y=lat,label=name),size=3.5)+
+      annotate('text',x=85,y=10,
+               label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                           time,sep=''),size=5)+
+      labs(x='',y='',fill='')+
+      coord_map()+
+      theme_bw()+
+      theme(panel.border=element_blank())
+  }else{
+    state_map=join(state,dat1,by='name')
+    ph=ggplot()+
+      geom_polygon(data=map,aes(x=long,y=lat,group=group),
+                   color="black",fill='white',size=0.2)+
+      geom_point(data=state_map,aes(x=long,y=lat,size=y),
+                 color='darkblue',alpha=0.7)+
+      geom_text(data=state_map,
+                aes(x=long,y=lat,label=name),size=3.5)+
+      scale_size_continuous(range=c(1,10))+
+      annotate('text',x=85,y=10,
+               label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                           time,sep=''),size=5)+
+      labs(x='',y='',size='')+
+      coord_map()+
+      theme_bw()+
+      theme(panel.border=element_blank())
+  }
+  return(ph)
+}
+
+reg_plot=function(time){
+  options(warn=-1)
+  name=price['name']$name[-1]
+  y=as.matrix(price[paste('X',time,sep='')])[-1]
+  x=as.matrix(income[paste('X',time,sep='')])[-1]
+  n=dim(x)[1]
+  p=dim(x)[2]
+  x=cbind(1,x)
+  beta_hat=solve(t(x)%*%x)%*%t(x)%*%y
+  y_bar=mean(y)
+  y_hat=x%*%beta_hat
+  R_2=sum((y_hat-y_bar)^2)/sum((y-y_bar)^2)
+  text='y=beta_0+beta_1x'
+  text=sub('beta_0',round(beta_hat[1],1),text)
+  text=sub('beta_1',round(beta_hat[2],3),text)
+  pd=data.frame(name=name,x=x[,2],y=y,y_hat=y_hat)
+  pd$fill=ifelse(pd$y>pd$y_hat,'房价较高','房价较低')
+  h_x=max(pd$x)
+  l_x=min(pd$x)
+  c_x=h_x-l_x
+  h_y=max(pd$y)
+  l_y=min(pd$y)
+  c_y=h_y-l_y
+  ph=ggplot(pd)+
+    geom_point(aes(x=x,y=y,color=fill),shape=2,size=2,alpha=0.1)+
+    geom_line(aes(x=x,y=y_hat),linetype=2,size=0.8)+
+    geom_text(aes(x=x,y=y,label=name,color=fill),size=4)+
+    labs(x='城镇居民家庭人均可支配收入',y='商品房销售平均价格',color='')+
+    annotate('text',x=l_x+c_x/5,y=h_y-c_y/12,
+             label=text,size=5)+
+    annotate('text',x=l_x+c_x/5,y=h_y-c_y/6,
+             label=paste('R_squre=',round(R_2,2),sep=''),size=5)+
+    annotate('text',x=h_x-c_x/5,y=l_y+c_y/12,
+             label=paste(strsplit(time,'[.]')[[1]][1],'.01-',
+                         time,sep=''),size=5)+
+    scale_color_manual(values=c('darkblue','darkred'))+
+    theme_bw()+
+    theme(axis.text=element_text(size=12),
+          axis.title=element_text(size=15),
+          legend.text=element_text(size=15))
+  return(ph)
+}
+
+shinyServer(function(input,output){
+  output$plot1=renderPlotly({ggplotly(income_plot(input$time1,input$type1))})
+  output$plot2=renderPlotly({ggplotly(price_plot(input$time2,input$type2))})
+  output$plot3=renderPlotly({ggplotly(reg_plot(input$time3))})
+})
